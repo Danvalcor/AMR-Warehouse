@@ -119,14 +119,14 @@ def detectLines(roiFrame, roi_center_x):
 def controlAlgorithm(xInt,xRoi, constSpeed = 100):
     if xRoi<xInt:
         correction=(np.abs(xRoi-xInt)*constSpeed)/xRoi
-        leftSpeed=constSpeed-correction
-        rightSpeed = constSpeed
+        leftSpeed=constSpeed
+        rightSpeed = constSpeed-correction
         print(f"Center: {xRoi}, Int: {xInt}, Derecha: {correction}")
 
     elif xRoi> xInt:
         correction=((xRoi-xInt)*constSpeed)/xRoi
-        rightSpeed=constSpeed-correction
-        leftSpeed = constSpeed
+        rightSpeed=constSpeed
+        leftSpeed = constSpeed-correction
         print(f"Center: {xRoi}, Int: {xInt}, Izquierda: {correction}")
     else:
         leftSpeed=constSpeed
@@ -192,15 +192,12 @@ def forward(leftSpeed, rightSpeed):
     # Back right
     GPIO.output(IN7, GPIO.HIGH) 
     GPIO.output(IN8, GPIO.LOW)   
-    
-    if not Stop.is_alive():
-        # Set PWM duty cycle for forward direO.ction
-        for left_pwm in left_motor_pwm:
-            left_pwm.ChangeDutyCycle(left_pwm_speed)
-        for right_pwm in left_motor_pwm:
-            right_pwm.ChangeDutyCycle(right_pwm_speed)
-	   
- 
+    print("left speed: ",left_pwm_speed," -----  right speed: ",right_pwm_speed)
+    # Set PWM duty cycle for forward
+    ENFI_pwm.ChangeDutyCycle(100)
+    ENFD_pwm.ChangeDutyCycle(100)
+    ENBI_pwm.ChangeDutyCycle(left_pwm_speed)
+    ENBD_pwm.ChangeDutyCycle(right_pwm_speed*.3) # Compensamos la velocidad 
 
 def open_camera(max_attempts=10):
     for i in range(max_attempts):
@@ -222,12 +219,14 @@ if __name__ == "__main__":
     IN2 = 25  # Pin GPIO para controlar un motor (frente izquierda hacia adelante  ) 
     IN3 = 5   # Pin GPIO para controlar un motor (adelante derecha)
     IN4 = 6   # Pin GPIO para controlar un motor (adelante derecha)
-
+    ENFI = 2
+    ENFD = 3
     IN5 = 20  # Pin GPIO para controlar un motor (atras izquierda)
     IN6 = 21  # Pin GPIO para controlar un motor (atras izquierda)
     IN7 = 24  # Pin GPIO para controlar un motor (atras derecha)
     IN8 = 23  # Pin GPIO para controlar un motor (atras derecha)
-
+    ENBI = 19
+    ENBD=26
     GPIO.setwarnings(False)
 
     trigPin = 4 #Ultrasonico trigger
@@ -249,7 +248,10 @@ if __name__ == "__main__":
     GPIO.setup(IN6, GPIO.OUT)
     GPIO.setup(IN7, GPIO.OUT)
     GPIO.setup(IN8, GPIO.OUT)
-
+    GPIO.setup(ENFI, GPIO.OUT)
+    GPIO.setup(ENFD, GPIO.OUT)
+    GPIO.setup(ENBI, GPIO.OUT)
+    GPIO.setup(ENBD, GPIO.OUT)
     # Define motor pins
     left_motor_pins = [IN1, IN5]  # Pins for left motor (forward and backward)
     right_motor_pins = [IN3, IN7]  # Pins for right motor (forward and backward)
@@ -259,10 +261,17 @@ if __name__ == "__main__":
     GPIO.output(IN4, GPIO.LOW) 
     GPIO.output(IN8, GPIO.LOW) 
 
-
+    ENFI_pwm=GPIO.PWM(ENFI,1000)
+    ENFI_pwm.start(0)
+    ENFD_pwm=GPIO.PWM(ENFD,1000)
+    ENFD_pwm.start(0)
+    ENBI_pwm=GPIO.PWM(ENBI,1000)
+    ENBI_pwm.start(0)
+    ENBD_pwm=GPIO.PWM(ENBD,1000)
+    ENBD_pwm.start(0)
     # Initialize PWM for left and right motors
-    left_motor_pwm = [GPIO.PWM(pin, 100) for pin in left_motor_pins]  # Pins 0 and 2 for left motor (forward and backward)
-    right_motor_pwm = [GPIO.PWM(pin, 100) for pin in right_motor_pins]  # Pins 0 and 2 for right motor (forward and backward)
+    #left_motor_pwm = [GPIO.PWM(pin, 100) for pin in left_motor_pins]  # Pins 0 and 2 for left motor (forward and backward)
+    #right_motor_pwm = [GPIO.PWM(pin, 100) for pin in right_motor_pins]  # Pins 0 and 2 for right motor (forward and backward)
 
     # Se crea una cola global o thread-safe para almacenar los datos generados
     data_queue = Queue()
@@ -318,7 +327,7 @@ if __name__ == "__main__":
         thread1.join()
         thread2.join()
 
-        MoveForward=threading.Thread(target=forward,args=(1, 1))
+       # MoveForward=threading.Thread(target=forward,args=(1, 1))
 	    
         distance_thread = threading.Thread(target=measure_distance, args=(trigPin, echoPin, stopDistance))
         distance_thread.start()
@@ -338,8 +347,8 @@ if __name__ == "__main__":
         else:
             thread_running = True 
             print("distance:", current_distance, "cm")
-            MoveForward.start()
-            MoveForward.join()
+           # MoveForward.start()
+           # MoveForward.join()
   	
   	    # Recupera las salidas de la cola y las almacena en un diccionario
         outputs = {}
@@ -351,12 +360,12 @@ if __name__ == "__main__":
         for roi, output in outputs.items():
             height, width = frame.shape[:2]
             resized_output = cv2.resize(output, (int(width * scale), int(height *scale)))
-            cv2.imshow(roi, resized_output)
+            #cv2.imshow(roi, resized_output)
             
         # Muestra la imagen original a tamano reducido
         height, width = frame.shape[:2]
         resized_output = cv2.resize(output, (int(width * scale), int(height *scale)))
-        cv2.imshow("Original view", resized_output)
+        #cv2.imshow("Original view", resized_output)
         
 	# Verifica si se presiona la tecla 'q' para salir del bucle
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -367,3 +376,4 @@ if __name__ == "__main__":
     cv2.destroyAllWindows()
     Stop.start()
     Stop.join()
+
